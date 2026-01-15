@@ -129,6 +129,11 @@ class OntologiesMadeEasyExternalModule extends \ExternalModules\AbstractExternal
 								<i class="fa-solid fa-spinner fa-spin-pulse rome-edit-field-ui-spinner-spinning"></i>
 								<i class="fa-solid fa-arrow-right fa-lg rome-edit-field-ui-spinner-not-spinning"></i>
 							</span>
+                            <!-- KI Toggle Switch -->
+                            <div class="form-check form-switch ms-2">
+                                <input class="form-check-input rome-em-ai-toggle" type="checkbox" id="rome-em-ai-toggle">
+                                <label class="form-check-label small" for="rome-em-ai-toggle">KI-Vorschläge</label>
+                            </div>
 							<select class="form-select form-select-sm w-auto">
 								<option>Field</option>
 								<option>Choice A</option>
@@ -216,7 +221,6 @@ class OntologiesMadeEasyExternalModule extends \ExternalModules\AbstractExternal
 	}
 
 	private function search_ontologies($payload) {
-
 		$term = trim($payload["term"] ?? "");
 		if ($term == "") return null;
 
@@ -235,7 +239,7 @@ class OntologiesMadeEasyExternalModule extends \ExternalModules\AbstractExternal
                 $minimal_datasets[] = file_get_contents($filename);
             }
         }
-                
+
 
 		foreach ($minimal_datasets as $minimal_dataset_string) {
             $minimal_dataset = json_decode($minimal_dataset_string, true);
@@ -248,61 +252,166 @@ class OntologiesMadeEasyExternalModule extends \ExternalModules\AbstractExternal
                     "display" => "<b>" . $minimal_dataset["name"] . "</b>: " . $found_item["name"]
                 ];
 		    }	
-		}		
-		
+		}
 
-		$bioportal_api_token = $GLOBALS["bioportal_api_token"] ?? "";
-		if ($bioportal_api_token == "") return null;
+        $use_ai = ($payload["use_ai"] ?? "0") === "1";
+        $extra = $use_ai ? $this->medcat_api($payload) : $this->bioportal_api($payload);
+        if (is_array($extra)) $result = array_merge($result, $extra);
+        return $result;
+	}
 
-		$bioportal_api_url = $GLOBALS["bioportal_api_url"] ?? "";
-		if ($bioportal_api_url == '') return null;
+    private function bioportal_api($payload) {
+        $term = trim($payload["term"] ?? "");
+        if ($term == "") return null;
 
-		// Fixed
-		$ontology_acronym = "SNOMEDCT";
+        $result = [];
+
+        $bioportal_api_token = $GLOBALS["bioportal_api_token"] ?? "";
+        if ($bioportal_api_token == "") return null;
+
+        $bioportal_api_url = $GLOBALS["bioportal_api_url"] ?? "";
+        if ($bioportal_api_url == '') return null;
+
+        // Fixed
+        $ontology_acronym = "SNOMEDCT";
         $ontology_system  = "http://snomed.info/sct";
 
 
-			// Build URL to call
-		$url = $bioportal_api_url . "search?q=".urlencode($term)."&ontologies=".urlencode($ontology_acronym)
-			 . "&suggest=true&include=prefLabel,notation,cui&display_links=false&display_context=false&format=json&apikey=" . $bioportal_api_token;
-		// Call the URL
-		$json = http_get($url);
-		
-		$response = json_decode($json, true);
+        // Build URL to call
+        $url = $bioportal_api_url . "search?q=".urlencode($term)."&ontologies=".urlencode($ontology_acronym)
+                . "&suggest=true&include=prefLabel,notation,cui&display_links=false&display_context=false&format=json&apikey=" . $bioportal_api_token;
+        // Call the URL
+        $json = http_get($url);
 
-		if (!$response || !$response["collection"]) return null;
-		
-		$dummy_data = [];
-		foreach ($response["collection"] as $item) {
-			$dummy_data[$item["notation"]] = $item["prefLabel"];
-		}
-	
-		foreach ($dummy_data as $val => $label) {
-			$display_item = "[$val] $label";
-			$display_item = filter_tags(label_decode($display_item));
-			$pos = stripos($display_item, $term);
-			if ($pos !== false) {
-				$term_length = strlen($term);
-				$display_item = substr($display_item, 0, $pos) . 
-					"<span class=\"rome-edit-field-ui-search-match\">".substr($display_item, $pos, $term_length)."</span>" . 
-					substr($display_item, $pos + $term_length);
-				$result[] = [
-					"value" => json_encode(["system" => $ontology_system, "code" => $val, "display" => $label]),
-					"label" => $label,
-					"display" => "<b>" . $ontology_acronym . "</b>: " . $display_item,
-				];
-			}
-		}
-		if (count($result) == 0) {
-			$result[] = [
-				"value" => "",
-				"label" => "",
-				"display" => $this->tt("fieldedit_16"),
-			];
-		}
+        $response = json_decode($json, true);
 
-		return $result;
-	}
+        if (!$response || !$response["collection"]) return null;
+
+        $dummy_data = [];
+        foreach ($response["collection"] as $item) {
+            $dummy_data[$item["notation"]] = $item["prefLabel"];
+        }
+
+        foreach ($dummy_data as $val => $label) {
+            $display_item = "[$val] $label";
+            $display_item = filter_tags(label_decode($display_item));
+            $pos = stripos($display_item, $term);
+            if ($pos !== false) {
+                $term_length = strlen($term);
+                $display_item = substr($display_item, 0, $pos) .
+                        "<span class=\"rome-edit-field-ui-search-match\">".substr($display_item, $pos, $term_length)."</span>" .
+                        substr($display_item, $pos + $term_length);
+                $result[] = [
+                        "value" => json_encode(["system" => $ontology_system, "code" => $val, "display" => $label]),
+                        "label" => $label,
+                        "display" => "<b>" . $ontology_acronym . "</b>: " . $display_item,
+                ];
+            }
+        }
+
+        if (count($result) == 0) {
+            $result[] = [
+                    "value" => "",
+                    "label" => "",
+                    "display" => $this->tt("fieldedit_16"),
+            ];
+        }
+
+        return $result;
+    }
+
+    private function medcat_api($payload) {
+        $term = trim($payload["term"] ?? "");
+        if ($term == "") return null;
+        $field_name = $payload['field_name'] ?? ($payload['name'] ?? '');
+        $field_label = $payload['field_label'] ?? '';
+        $choices     = $payload['choices'] ?? '';
+
+        //Build Text for MedCAT NLP
+        $medcat_url = $GLOBALS["medcat_api_url"] ?? "";
+        if ($medcat_url == "") return null;
+
+        $medcat_text = trim(
+                ($field_label ? $field_label . ". " : "") .
+                ($field_name  ? "Variable name: $field_name. " : "") .
+                ($choices     ? "Values: $choices." : "")
+        );
+        if ($medcat_text === '') $medcat_text = $term;
+
+        //API Call zu MedCATService
+        $url = rtrim($medcat_url, "/") . "/api/process";  // MedCATService API
+
+        $body = json_encode([
+                "content" => [
+                        "text" => $medcat_text
+                ]
+        ], JSON_UNESCAPED_UNICODE);
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $body,
+                CURLOPT_HTTPHEADER => [
+                        "Content-Type: application/json",
+                        "Accept: application/json",
+                ],
+                CURLOPT_TIMEOUT => 10,
+        ]);
+
+        $json = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($json === false || $http_code < 200 || $http_code >= 300) {
+            return null;
+        }
+
+        $response = json_decode($json, true);
+        if (!is_array($response) || !($response["result"]["success"] ?? false)) return null;
+
+        //Mapping Response
+        $ontology_acronym = "SNOMEDCT";
+        $ontology_system  = "http://snomed.info/sct";
+
+        $anns = $response["result"]["annotations"] ?? [];
+        if (!is_array($anns) || count($anns) === 0) return null;
+        $ann_map = $annotations[0] ?? null;
+        if (!is_array($ann_map) || count($ann_map) === 0) return null;
+
+        $result = [];
+
+        foreach ($ann_map as $ann) {
+            if (!is_array($ann)) continue;
+
+            $code  = (string)($ann["cui"] ?? "");
+            $label = (string)($ann["pretty_name"] ?? "");
+            if ($code === "" || $label === "") continue;
+
+            $display_item = "[$code] $label";
+            $display_item = filter_tags(label_decode($display_item));
+
+            // Highlight nur den UI-Suchterm (nicht den ganzen Kontexttext)
+            $pos = ($term !== "") ? stripos($display_item, $term) : false;
+            if ($pos !== false) {
+                $term_length = strlen($term);
+                $display_item = substr($display_item, 0, $pos) .
+                        "<span class=\"rome-edit-field-ui-search-match\">" . substr($display_item, $pos, $term_length) . "</span>" .
+                        substr($display_item, $pos + $term_length);
+            }
+
+            $result[] = [
+                    "value" => json_encode(["system" => $ontology_system, "code" => $code, "display" => $label]),
+                    "label" => $label,
+                    "display" => "<b>" . $ontology_acronym . "</b>: " . $display_item,
+            ];
+
+            if (count($result) >= 10) break; // Top-K
+        }
+
+        if (count($result) == 0) return null;
+        return $result;
+    }
 
 
 	/**

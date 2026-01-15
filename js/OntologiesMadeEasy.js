@@ -24,6 +24,9 @@ let config = {};
 
 const data = {};
 
+//AI Toggle Marker
+let romeUseAI = false;
+
 //#endregion
 
 /**
@@ -198,12 +201,14 @@ function addEditFieldUI($dlg, isMatrix) {
 	});
 	// Init auto completion
 	const $searchInput = $ui.find('input[name="rome-em-fieldedit-search"]');
+		const $aiToggle = $ui.find('.rome-em-ai-toggle');
 		const $searchSpinner = $ui.find('.rome-edit-field-ui-spinner');
 		const throttledSearch = throttle(function(request, response) {
 		const payload = {
 			"term": request.term,
 			"isMatrix": isMatrix,
 			"name": isMatrix ? $dlg.find('input[name="grid_name"]').val() : $dlg.find('input[name="field_name"]').val(),
+			"use_ai": $aiToggle.is(':checked') ? "1" : "0",
 			// TODO - maybe need add value from target dropdown, in case this affect what we do here
 		};
 		$searchSpinner.addClass('busy');
