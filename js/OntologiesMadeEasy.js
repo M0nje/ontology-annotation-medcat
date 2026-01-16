@@ -208,7 +208,12 @@ function addEditFieldUI($dlg, isMatrix) {
 			"term": request.term,
 			"isMatrix": isMatrix,
 			"name": isMatrix ? $dlg.find('input[name="grid_name"]').val() : $dlg.find('input[name="field_name"]').val(),
+			//Add variables for MedCAT annotations
 			"use_ai": $aiToggle.is(':checked') ? "1" : "0",
+			"label":
+				$dlg.find('textarea[name="field_label"]').val() || '',
+			"choices":
+				$dlg.find('textarea[name="element_enum"]').val() || '',
 			// TODO - maybe need add value from target dropdown, in case this affect what we do here
 		};
 		$searchSpinner.addClass('busy');

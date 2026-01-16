@@ -323,30 +323,37 @@ class OntologiesMadeEasyExternalModule extends \ExternalModules\AbstractExternal
     private function medcat_api($payload) {
         $term = trim($payload["term"] ?? "");
         if ($term == "") return null;
-        $field_name = $payload['field_name'] ?? ($payload['name'] ?? '');
-        $field_label = $payload['field_label'] ?? '';
-        $choices     = $payload['choices'] ?? '';
+        $name = $payload['name'] ?? '';
+        $label = $payload['label'] ?? '';
+        $choices = $payload['choices'] ?? '';
 
-        //Build Text for MedCAT NLP
-        $medcat_url = $GLOBALS["medcat_api_url"] ?? "";
-        if ($medcat_url == "") return null;
+        $ontology_acronym = "SNOMEDCT";
+        $ontology_system  = "http://snomed.info/sct";
 
+        //Build Text for MedCAT NLP to annotate in format: "$term. $name. $label. Can be: $choices"
         $medcat_text = trim(
-                ($field_label ? $field_label . ". " : "") .
-                ($field_name  ? "Variable name: $field_name. " : "") .
-                ($choices     ? "Values: $choices." : "")
+                ($term ? $term . ". " : "") .
+                ($name  ? $name . ". " : "") .
+                ($label ? $label . ". " : "") .
+                ($choices ? "Can be: $choices." : "")
         );
         if ($medcat_text === '') $medcat_text = $term;
 
-        //API Call zu MedCATService
-        $url = rtrim($medcat_url, "/") . "/api/process";  // MedCATService API
+        //Build MedCATService API URL from Project Settings
+        $medcat_url = trim((string)($this->getProjectSetting("medcat_api_url") ?? ""));
+        if ($medcat_url === "") return null;
+        $url = rtrim($medcat_url, "/") . "/api/process";
 
+        //API Call to MedCATService
+
+        //Build JSON Body and add text to annotate
         $body = json_encode([
                 "content" => [
                         "text" => $medcat_text
                 ]
         ], JSON_UNESCAPED_UNICODE);
 
+        //Curl API Call
         $ch = curl_init($url);
         curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
@@ -367,15 +374,13 @@ class OntologiesMadeEasyExternalModule extends \ExternalModules\AbstractExternal
             return null;
         }
 
+        //Decode JSON Response
         $response = json_decode($json, true);
         if (!is_array($response) || !($response["result"]["success"] ?? false)) return null;
 
-        //Mapping Response
-        $ontology_acronym = "SNOMEDCT";
-        $ontology_system  = "http://snomed.info/sct";
-
-        $anns = $response["result"]["annotations"] ?? [];
-        if (!is_array($anns) || count($anns) === 0) return null;
+        //Mapping Response to result
+        $annotations = $response["result"]["annotations"] ?? [];
+        if (!is_array($annotations) || count($annotations) === 0) return null;
         $ann_map = $annotations[0] ?? null;
         if (!is_array($ann_map) || count($ann_map) === 0) return null;
 
@@ -391,25 +396,28 @@ class OntologiesMadeEasyExternalModule extends \ExternalModules\AbstractExternal
             $display_item = "[$code] $label";
             $display_item = filter_tags(label_decode($display_item));
 
-            // Highlight nur den UI-Suchterm (nicht den ganzen Kontexttext)
-            $pos = ($term !== "") ? stripos($display_item, $term) : false;
+            $pos = stripos($display_item, $term);
             if ($pos !== false) {
                 $term_length = strlen($term);
                 $display_item = substr($display_item, 0, $pos) .
                         "<span class=\"rome-edit-field-ui-search-match\">" . substr($display_item, $pos, $term_length) . "</span>" .
                         substr($display_item, $pos + $term_length);
+                $result[] = [
+                        "value" => json_encode(["system" => $ontology_system, "code" => $code, "display" => $label]),
+                        "label" => $label,
+                        "display" => "<b>" . $ontology_acronym . "</b>: " . $display_item,
+                ];
             }
-
-            $result[] = [
-                    "value" => json_encode(["system" => $ontology_system, "code" => $code, "display" => $label]),
-                    "label" => $label,
-                    "display" => "<b>" . $ontology_acronym . "</b>: " . $display_item,
-            ];
-
-            if (count($result) >= 10) break; // Top-K
         }
 
-        if (count($result) == 0) return null;
+        if (count($result) == 0) {
+            $result[] = [
+                    "value" => "",
+                    "label" => "",
+                    "display" => $this->tt("fieldedit_16"),
+            ];
+        }
+
         return $result;
     }
 

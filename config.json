@@ -42,6 +42,11 @@
 			"name": "Additional Minimal Dataset (a json with keys 'name', and 'items')",
 			"type": "json",
 			"repeatable": "true"
+		},
+		{
+			"key": "medcat_api_url",
+			"name": "MedCATService API URL (Base URL, z.B. http://medcat-service:5000)",
+			"type": "text"
 		}
 	],
 	"auth-ajax-actions": [
