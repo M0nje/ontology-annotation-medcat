@@ -1,10 +1,15 @@
 {
-	"name": "ROME: REDCap Ontologies Made Easy",
+	"name": "ROME-MedCAT: REDCap Ontologies Made Easy with MedCAT",
 	"tt_name": "module_name",
-	"namespace": "DE\\RUB\\OntologiesMadeEasyExternalModule",
-	"description": "A REDCap external module that facilitates adding and editing ontology annotations.",
+	"namespace": "DE\\RUB\\OntologiesMadeEasyMedCATExternalModule",
+	"description": "A REDCap external module that facilitates adding and editing ontology annotations with MedCAT.",
 	"documentation": "README.md",
 	"authors": [
+		{
+			"name": "Mona Perbix",
+			"email": "perbix@studserv.uni-leipzig.de",
+			"institution": "Institut für Medizinische Informatik, Statistik und Epidemiologie (IMISE) | Universität Leipzig"
+		},
 		{
 			"name": "Günther Rezniczek",
 			"email": "guenther.rezniczek@rub.de",
@@ -60,19 +65,19 @@
 	"links": {
 		"project": [
 			{
-				"name": "Ontologies Made Easy",
+				"name": "Ontologies Made Easy with MedCAT",
 				"icon": "fa-solid fa-tree",
 				"url": "plugin/index.php",
 				"show-header-and-footer": true
 			},
 		        { 
-				"name": "ROME - Discover projects",
+				"name": "ROME with MedCAT - Discover projects",
 				"icon": "fa fa-search",
 				"url": "plugin/discover.php",
 				"show-header-and-footer": true
 			},
 		        { 
-				"name": "ROME - Utility functions",
+				"name": "ROME with MedCAT- Utility functions",
 				"icon": "fa fa-tools",
 				"url": "plugin/utils.php",
 				"show-header-and-footer": true
